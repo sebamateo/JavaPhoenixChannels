@@ -1,7 +1,7 @@
 package org.phoenixframework.channels
 
-import Specification
-import BlockingVariable
+import spock.lang.Specification
+import spock.util.concurrent.BlockingVariable
 
 class SocketSpec extends Specification {
 

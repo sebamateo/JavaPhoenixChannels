@@ -4,29 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.LinkedBlockingQueue;
-
+import okhttp3.*;
+import okio.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
-import okio.ByteString;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Socket {
 
@@ -120,7 +106,7 @@ public class Socket {
 
     private static final int DEFAULT_HEARTBEAT_INTERVAL = 7000;
 
-    private final List<Channel> channels = new ArrayList<>();
+    private final CopyOnWriteArrayList<Channel> channels = new CopyOnWriteArrayList<>();
 
     private String endpointUri = null;
 
@@ -145,10 +131,10 @@ public class Socket {
     private final LinkedBlockingQueue<RequestBody> sendBuffer = new LinkedBlockingQueue<>();
 
     private final Set<ISocketCloseCallback> socketCloseCallbacks = Collections
-        .newSetFromMap(new HashMap<ISocketCloseCallback, Boolean>());
+            .newSetFromMap(new HashMap<ISocketCloseCallback, Boolean>());
 
     private final Set<ISocketOpenCallback> socketOpenCallbacks = Collections
-        .newSetFromMap(new HashMap<ISocketOpenCallback, Boolean>());
+            .newSetFromMap(new HashMap<ISocketOpenCallback, Boolean>());
 
     private Timer timer = null;
 
@@ -179,8 +165,8 @@ public class Socket {
 
         public Socket build() {
             return new Socket(endpointUri,
-                heartbeatIntervalInMs == null ? DEFAULT_HEARTBEAT_INTERVAL : heartbeatIntervalInMs,
-                httpClient == null ? new OkHttpClient() : httpClient);
+                    heartbeatIntervalInMs == null ? DEFAULT_HEARTBEAT_INTERVAL : heartbeatIntervalInMs,
+                    httpClient == null ? new OkHttpClient() : httpClient);
         }
     }
 
@@ -216,9 +202,8 @@ public class Socket {
     public Channel chan(final String topic, final JsonNode payload) {
         log.trace("chan: {}, {}", topic, payload);
         final Channel channel = new Channel(topic, payload, Socket.this);
-        synchronized (channels) {
-            channels.add(channel);
-        }
+        channels.add(channel);
+
         return channel;
     }
 
@@ -227,7 +212,7 @@ public class Socket {
         disconnect();
         // No support for ws:// or ws:// in okhttp. See https://github.com/square/okhttp/issues/1652
         final String httpUrl = this.endpointUri.replaceFirst("^ws:", "http:")
-            .replaceFirst("^wss:", "https:");
+                .replaceFirst("^wss:", "https:");
         final Request request = new Request.Builder().url(httpUrl).build();
         webSocket = httpClient.newWebSocket(request, wsListener);
     }
@@ -336,30 +321,21 @@ public class Socket {
      * @param channel The channel to be removed
      */
     public void remove(final Channel channel) {
-        synchronized (channels) {
-            for (final Iterator chanIter = channels.iterator(); chanIter.hasNext(); ) {
-                if (chanIter.next() == channel) {
-                    chanIter.remove();
-                    break;
-                }
-            }
-        }
+        channels.remove(channel);
     }
 
     public void removeAllChannels() {
-        synchronized (channels) {
-            channels.clear();
-        }
+        channels.clear();
     }
 
     @Override
     public String toString() {
         return "PhoenixSocket{" +
-            "endpointUri='" + endpointUri + '\'' +
-            ", channels(" + channels.size() + ")=" + channels +
-            ", refNo=" + refNo +
-            ", webSocket=" + webSocket +
-            '}';
+                "endpointUri='" + endpointUri + '\'' +
+                ", channels(" + channels.size() + ")=" + channels +
+                ", refNo=" + refNo +
+                ", webSocket=" + webSocket +
+                '}';
     }
 
     synchronized String makeRef() {
@@ -419,7 +395,7 @@ public class Socket {
                 if (Socket.this.isConnected()) {
                     try {
                         Envelope envelope = new Envelope("phoenix", "heartbeat",
-                            new ObjectNode(JsonNodeFactory.instance), Socket.this.makeRef());
+                                new ObjectNode(JsonNodeFactory.instance), Socket.this.makeRef());
                         Socket.this.push(envelope);
                     } catch (Exception e) {
                         log.error("Failed to send heartbeat", e);
@@ -429,7 +405,7 @@ public class Socket {
         };
 
         timer.schedule(Socket.this.heartbeatTimerTask, Socket.this.heartbeatInterval,
-            Socket.this.heartbeatInterval);
+                Socket.this.heartbeatInterval);
     }
 
     private void triggerChannelError() {
